@@ -53,16 +53,16 @@ OPTION(ALSOFT_DLOPEN  "Check for the dlopen API for loading optional libs"  ON)
 
 OPTION(ALSOFT_WERROR  "Treat compile warnings as errors"      OFF)
 
-OPTION(ALSOFT_UTILS          "Build and install utility programs"         ON)
-OPTION(ALSOFT_NO_CONFIG_UTIL "Disable building the alsoft-config utility" OFF)
+OPTION(ALSOFT_UTILS          "Build and install utility programs"         OFF)
+OPTION(ALSOFT_NO_CONFIG_UTIL "Disable building the alsoft-config utility" ON)
 
-OPTION(ALSOFT_EXAMPLES  "Build and install example programs"  ON)
-OPTION(ALSOFT_TESTS     "Build and install test programs"     ON)
+OPTION(ALSOFT_EXAMPLES  "Build and install example programs"  OFF)
+OPTION(ALSOFT_TESTS     "Build and install test programs"     OFF)
 
-OPTION(ALSOFT_CONFIG "Install alsoft.conf sample configuration file" ON)
-OPTION(ALSOFT_HRTF_DEFS "Install HRTF definition files" ON)
-OPTION(ALSOFT_AMBDEC_PRESETS "Install AmbDec preset files" ON)
-OPTION(ALSOFT_INSTALL "Install headers and libraries" ON)
+OPTION(ALSOFT_CONFIG "Install alsoft.conf sample configuration file" OFF)
+OPTION(ALSOFT_HRTF_DEFS "Install HRTF definition files" OFF)
+OPTION(ALSOFT_AMBDEC_PRESETS "Install AmbDec preset files" OFF)
+OPTION(ALSOFT_INSTALL "Install headers and libraries" OFF)
 
 if(DEFINED SHARE_INSTALL_DIR)
     message(WARNING "SHARE_INSTALL_DIR is deprecated.  Use the variables provided by the GNUInstallDirs module instead")
@@ -81,7 +81,7 @@ SET(LINKER_FLAGS )
 SET(EXTRA_LIBS )
 
 IF(WIN32)
-    SET(CPP_DEFS ${CPP_DEFS} _WIN32 _WIN32_WINNT=0x0502)
+    SET(CPP_DEFS ${CPP_DEFS} _WIN32 _WIN32_WINNT=0x0501)
 
     OPTION(ALSOFT_BUILD_ROUTER  "Build the router (EXPERIMENTAL; creates OpenAL32.dll and soft_oal.dll)"  OFF)
 
@@ -195,11 +195,13 @@ IF(MSVC)
         MESSAGE(STATUS "Using DirectX SDK directory: ${DXSDK_DIR}")
     ENDIF()
 
-    OPTION(FORCE_STATIC_VCRT "Force /MT for static VC runtimes" OFF)
+    OPTION(FORCE_STATIC_VCRT "Force /MT for static VC runtimes" ON)
     IF(FORCE_STATIC_VCRT)
         FOREACH(flag_var
                 CMAKE_C_FLAGS CMAKE_C_FLAGS_DEBUG CMAKE_C_FLAGS_RELEASE
-                CMAKE_C_FLAGS_MINSIZEREL CMAKE_C_FLAGS_RELWITHDEBINFO)
+                CMAKE_C_FLAGS_MINSIZEREL CMAKE_C_FLAGS_RELWITHDEBINFO
+                CMAKE_CXX_FLAGS CMAKE_CXX_FLAGS_DEBUG CMAKE_CXX_FLAGS_RELEASE
+                CMAKE_CXX_FLAGS_MINSIZEREL CMAKE_CXX_FLAGS_RELWITHDEBINFO)
             IF(${flag_var} MATCHES "/MD")
                 STRING(REGEX REPLACE "/MD" "/MT" ${flag_var} "${${flag_var}}")
             ENDIF()
@@ -442,7 +444,9 @@ IF(HAVE_INTRIN_H)
 ENDIF()
 
 CHECK_SYMBOL_EXISTS(posix_memalign   stdlib.h HAVE_POSIX_MEMALIGN)
+if (UNIX)
 CHECK_SYMBOL_EXISTS(_aligned_malloc  malloc.h HAVE__ALIGNED_MALLOC)
+endif()
 CHECK_SYMBOL_EXISTS(proc_pidpath     libproc.h HAVE_PROC_PIDPATH)
 
 CHECK_FUNCTION_EXISTS(stat HAVE_STAT)
@@ -559,6 +563,9 @@ SET(COMMON_OBJS
     common/vecmat.h
     common/vector.h
 )
+if ("$ENV{TRAVIS_JOB_NAME}" STREQUAL "Linux x64")
+	list(APPEND COMMON_OBJS common/wrap_memcpy.c)
+endif()
 SET(OPENAL_OBJS
     al/auxeffectslot.cpp
     al/auxeffectslot.h
@@ -861,7 +868,7 @@ IF(WIN32)
     ENDIF()
 
     SET(OLD_REQUIRED_DEFINITIONS ${CMAKE_REQUIRED_DEFINITIONS})
-    SET(CMAKE_REQUIRED_DEFINITIONS ${CMAKE_REQUIRED_DEFINITIONS} -D_WIN32_WINNT=0x0502)
+    SET(CMAKE_REQUIRED_DEFINITIONS ${CMAKE_REQUIRED_DEFINITIONS} -D_WIN32_WINNT=0x0501)
 
     # Check MMSystem backend
     CHECK_INCLUDE_FILES("windows.h;mmsystem.h" HAVE_MMSYSTEM_H)

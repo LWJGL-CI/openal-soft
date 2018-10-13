@@ -1,68 +1,142 @@
-language: cpp
+git:
+  depth: 3
+env:
+  global:
+  - secure: "L/pzocpnCGawVmTwPt+Y8xxTryePptOdkNM4NvJLVsyH5aIz+026TFwZ2lR01mBjhclO/CbdyaW774PRq4XE4qN/huSs35fXbyw9z6NoF+QgC99MrbNVvEsXdERY/3s+HLw+KgtYbDnxaicPutq65dmJgOipH7vYACyKPpgAiTg="
+  - secure: "Wv8lNh+gdT5sq2prOl1xVd5f0yMBJRxzs2l+x/J8XwtEfLNvof9HTX7hfkpF8/r6wpM8GtqGOHsq3XMHGwrIrX1TaYrDGPlQ6BXb07nWW+G6YIzjwTK8df+VRd5lGeJol+HW7TYstC+Hn82UAYjkoUCI86yHxNgImftrMT6ez6A="
+  - AWS_DEFAULT_REGION: "us-east-1"
+  - S3_PARAMS: '"--acl public-read --cache-control \"public,must-revalidate,proxy-revalidate,max-age=0\""'
+  - CMAKE_BUILD_PARALLEL_LEVEL: 4
+  - LINUX_CMAKE_PARAMS: '"-DALSOFT_REQUIRE_ALSA=ON -DALSOFT_REQUIRE_OSS=ON -DALSOFT_REQUIRE_PORTAUDIO=ON -DALSOFT_REQUIRE_PULSEAUDIO=ON -DALSOFT_REQUIRE_JACK=ON -DALSOFT_EMBED_HRTF_DATA=YES -DCMAKE_BUILD_TYPE=Release"'
+
 matrix:
   include:
-    - os: linux
-      dist: xenial
-    - os: linux
-      dist: trusty
-      env:
-        - BUILD_ANDROID=true
-    - os: osx
-sudo: required
-install:
-  - >
-    if [[ "${TRAVIS_OS_NAME}" == "linux" && -z "${BUILD_ANDROID}" ]]; then
-      # Install pulseaudio, portaudio, ALSA, JACK dependencies for
-      # corresponding backends.
-      # Install Qt5 dependency for alsoft-config.
-      sudo apt-get install -qq \
-        libpulse-dev \
-        portaudio19-dev \
-        libasound2-dev \
-        libjack-dev \
-        qtbase5-dev
-    fi
-  - >
-    if [[ "${TRAVIS_OS_NAME}" == "linux" && "${BUILD_ANDROID}" == "true" ]]; then
-      curl -o ~/android-ndk.zip https://dl.google.com/android/repository/android-ndk-r16b-linux-x86_64.zip
-      unzip -q ~/android-ndk.zip -d ~ \
-        'android-ndk-r16b/build/cmake/*' \
-        'android-ndk-r16b/build/core/toolchains/arm-linux-androideabi-*/*' \
-        'android-ndk-r16b/platforms/android-14/arch-arm/*' \
-        'android-ndk-r16b/source.properties' \
-        'android-ndk-r16b/sources/android/support/include/*' \
-        'android-ndk-r16b/sources/cxx-stl/llvm-libc++/libs/armeabi-v7a/*' \
-        'android-ndk-r16b/sources/cxx-stl/llvm-libc++/include/*' \
-        'android-ndk-r16b/sysroot/*' \
-        'android-ndk-r16b/toolchains/arm-linux-androideabi-4.9/prebuilt/linux-x86_64/*' \
-        'android-ndk-r16b/toolchains/llvm/prebuilt/linux-x86_64/*'
-    fi
-script:
-  - >
-    if [[ "${TRAVIS_OS_NAME}" == "linux" && -z "${BUILD_ANDROID}" ]]; then
-      cmake \
-        -DALSOFT_REQUIRE_ALSA=ON \
-        -DALSOFT_REQUIRE_OSS=ON \
-        -DALSOFT_REQUIRE_PORTAUDIO=ON \
-        -DALSOFT_REQUIRE_PULSEAUDIO=ON \
-        -DALSOFT_REQUIRE_JACK=ON \
-        -DALSOFT_EMBED_HRTF_DATA=YES \
-        .
-    fi
-  - >
-    if [[ "${TRAVIS_OS_NAME}" == "linux" && "${BUILD_ANDROID}" == "true" ]]; then
-      cmake \
-        -DANDROID_STL=c++_shared \
-        -DCMAKE_TOOLCHAIN_FILE=~/android-ndk-r16b/build/cmake/android.toolchain.cmake \
-        -DALSOFT_REQUIRE_OPENSL=ON \
-        -DALSOFT_EMBED_HRTF_DATA=YES \
-        .
-    fi
-  - >
-    if [[ "${TRAVIS_OS_NAME}" == "osx" ]]; then
-      cmake \
-        -DALSOFT_REQUIRE_COREAUDIO=ON \
-        -DALSOFT_EMBED_HRTF_DATA=YES \
-        .
-    fi
-  - make -j2
+
+  # -----------------
+  - name: "Linux x64"
+  # -----------------
+    dist: xenial
+    language: c
+    compiler: gcc
+
+    addons:
+      apt:
+        packages:
+        #- gcc-5.4
+        #- g++-5.4
+        - cmake
+        - libpulse-dev
+        - portaudio19-dev
+        - libasound2-dev
+        - libjack-dev
+
+    before_install:
+    - pip install --user awscli
+    - export PATH=$PATH:$HOME/.local/bin
+
+    script:
+    - mkdir LINUX
+    - cd LINUX
+    #- "CC=gcc-5.4 CXX=g++-5.4 cmake $LINUX_CMAKE_PARAMS -DCMAKE_C_FLAGS=\"-U_FORTIFY_SOURCE -D_FORTIFY_SOURCE=0\" -DCMAKE_SHARED_LINKER_FLAGS=-Wl,--wrap,memcpy .."
+    - "cmake $LINUX_CMAKE_PARAMS -DCMAKE_C_FLAGS=\"-U_FORTIFY_SOURCE -D_FORTIFY_SOURCE=0\" -DCMAKE_SHARED_LINKER_FLAGS=-Wl,--wrap,memcpy .."
+    - cmake --build .
+    - strip libopenal.so
+    - "git log --first-parent --pretty=format:%H HEAD~2..HEAD~1 > revision.git"
+    - "aws s3 cp libopenal.so s3://build.lwjgl.org/nightly/linux/x64/libopenal.so $S3_PARAMS"
+    - "aws s3 cp revision.git s3://build.lwjgl.org/nightly/linux/x64/libopenal.so.git $S3_PARAMS"
+
+  # -----------------
+  - name: "Linux arm32"
+  # -----------------
+    dist: xenial
+    language: c
+    compiler: gcc
+
+    addons:
+      apt:
+        packages:
+        - cmake
+        - gcc-5-arm-linux-gnueabihf
+        - g++-5-arm-linux-gnueabihf
+        - libc6-dev-armhf-cross
+
+    before_install:
+    - pip install --user awscli
+    - export PATH=$PATH:$HOME/.local/bin
+    - sudo sed -i 's/deb http/deb [arch=amd64,i386] http/' /etc/apt/sources.list
+    - sudo grep "ubuntu.com/ubuntu" /etc/apt/sources.list | sudo tee /etc/apt/sources.list.d/ports.list
+    - sudo sed -i 's/amd64,i386/armhf,arm64/' /etc/apt/sources.list.d/ports.list
+    - sudo sed -i 's#http://.*/ubuntu#http://ports.ubuntu.com/ubuntu-ports#' /etc/apt/sources.list.d/ports.list
+    - sudo dpkg --add-architecture armhf
+    - sudo apt-get update || true
+    - sudo apt-get -yq --no-install-suggests --no-install-recommends install libpulse-dev:armhf libglib2.0-dev:armhf portaudio19-dev:armhf libasound2-dev:armhf libjack-dev:armhf
+
+    script:
+    - mkdir LINUX
+    - cd LINUX
+    - "cmake -DCMAKE_TOOLCHAIN_FILE=../XCompile-arm.txt -DHOST=arm-linux-gnueabihf $LINUX_CMAKE_PARAMS -DCMAKE_C_FLAGS=\"-U_FORTIFY_SOURCE -D_FORTIFY_SOURCE=0\" .."
+    - cmake --build .
+    - arm-linux-gnueabihf-strip libopenal.so
+    - "git log --first-parent --pretty=format:%H HEAD~2..HEAD~1 > revision.git"
+    - "aws s3 cp libopenal.so s3://build.lwjgl.org/nightly/linux/arm32/libopenal.so $S3_PARAMS"
+    - "aws s3 cp revision.git s3://build.lwjgl.org/nightly/linux/arm32/libopenal.so.git $S3_PARAMS"
+
+  # -----------------
+  - name: "Linux arm64"
+  # -----------------
+    dist: xenial
+    language: c
+    compiler: gcc
+
+    addons:
+      apt:
+        packages:
+        - cmake
+        - cmake-data
+        - gcc-5-aarch64-linux-gnu
+        - g++-5-aarch64-linux-gnu
+        - libc6-dev-arm64-cross
+
+    before_install:
+    - pip install --user awscli
+    - export PATH=$PATH:$HOME/.local/bin
+    - sudo sed -i 's/deb http/deb [arch=amd64,i386] http/' /etc/apt/sources.list
+    - sudo grep "ubuntu.com/ubuntu" /etc/apt/sources.list | sudo tee /etc/apt/sources.list.d/ports.list
+    - sudo sed -i 's/amd64,i386/armhf,arm64/' /etc/apt/sources.list.d/ports.list
+    - sudo sed -i 's#http://.*/ubuntu#http://ports.ubuntu.com/ubuntu-ports#' /etc/apt/sources.list.d/ports.list
+    - sudo dpkg --add-architecture arm64
+    - sudo apt-get update || true
+    - sudo apt-get -yq --no-install-suggests --no-install-recommends install libpulse-dev:arm64 portaudio19-dev:arm64 libasound2-dev:arm64 libjack-dev:arm64
+
+    script:
+    - mkdir LINUX
+    - cd LINUX
+    - "cmake -DCMAKE_TOOLCHAIN_FILE=../XCompile-arm.txt -DHOST=aarch64-linux-gnu $LINUX_CMAKE_PARAMS -DCMAKE_C_FLAGS=\"-U_FORTIFY_SOURCE -D_FORTIFY_SOURCE=0\" .."
+    - cmake --build .
+    - aarch64-linux-gnu-strip libopenal.so
+    - "git log --first-parent --pretty=format:%H HEAD~2..HEAD~1 > revision.git"
+    - "aws s3 cp libopenal.so s3://build.lwjgl.org/nightly/linux/arm64/libopenal.so $S3_PARAMS"
+    - "aws s3 cp revision.git s3://build.lwjgl.org/nightly/linux/arm64/libopenal.so.git $S3_PARAMS"
+
+  # -----------------
+  - name: "macOS"
+  # -----------------
+    language: objective-c
+    osx_image: xcode11.3
+    compiler: clang
+
+    before_install:
+    - brew update
+
+    install:
+    - brew install awscli
+
+    script:
+    - mkdir OSX
+    - cd OSX
+    - cmake -DALSOFT_REQUIRE_COREAUDIO=ON -DALSOFT_EMBED_HRTF_DATA=YES -DCMAKE_BUILD_TYPE=Release -DCMAKE_OSX_DEPLOYMENT_TARGET=10.9 ..
+    - cmake --build .
+    - strip -u -r libopenal.dylib
+    - "git log --first-parent --pretty=format:%H HEAD~2..HEAD~1 > revision.git"
+    - "aws s3 cp libopenal.dylib s3://build.lwjgl.org/nightly/macosx/x64/libopenal.dylib $S3_PARAMS"
+    - "aws s3 cp revision.git s3://build.lwjgl.org/nightly/macosx/x64/libopenal.dylib.git  $S3_PARAMS"
