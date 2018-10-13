@@ -396,8 +396,13 @@ static ALCenum ALCdsoundPlayback_open(ALCdsoundPlayback *self, const ALCchar *de
     //DirectSound Init code
     if(SUCCEEDED(hr))
         hr = DirectSoundCreate(guid, &self->DS, NULL);
-    if(SUCCEEDED(hr))
-        hr = IDirectSound_SetCooperativeLevel(self->DS, GetForegroundWindow(), DSSCL_PRIORITY);
+	if(SUCCEEDED(hr))
+	{
+        HWND hWnd = GetForegroundWindow();
+        if (hWnd == NULL)
+            hWnd = GetDesktopWindow();
+        hr = IDirectSound_SetCooperativeLevel(self->DS, hWnd, DSSCL_PRIORITY);
+	}
     if(FAILED(hr))
     {
         if(self->DS)

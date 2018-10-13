@@ -1,19 +1,50 @@
-version: 1.19.0.{build}
-
+version: 1.19.1.'{build}'
+branches:
+  only:
+  - master-linux64
+skip_tags: true
+image: Visual Studio 2017
+clone_depth: 3
 environment:
-    matrix:
-      - GEN: "Visual Studio 14 2015"
-        CFG: Release
-      - GEN: "Visual Studio 14 2015 Win64"
-        CFG: Release
-
-install:
-    # Remove the VS Xamarin targets to reduce AppVeyor specific noise in build
-    # logs.  See also http://help.appveyor.com/discussions/problems/4569
-    - del "C:\Program Files (x86)\MSBuild\14.0\Microsoft.Common.targets\ImportAfter\Xamarin.Common.targets"
-
+  AWS_ACCESS_KEY_ID:
+    secure: 7jhk0oV/vjFsOcsAHLMUcNGUGLuGmnuPxGH0ce/Vky8=
+  AWS_SECRET_ACCESS_KEY:
+    secure: 5KKYpsIHwYHHh5ud0U7Ss0rLumv6G8tkS6abh1B9aq4wY6+1kq5fN/3E5BsdBVKy
+  AWS_DEFAULT_REGION: us-east-1
+  S3_CONFIG_VOLATILE: --acl public-read --storage-class REDUCED_REDUNDANCY --cache-control "public, must-revalidate, proxy-revalidate, max-age=0"
+  GIT_FORMAT: '%%H'
+  matrix:
+  - ARCH: x64
+    GENERATOR: "Visual Studio 15 2017 Win64"
+    LIBNAME: OpenAL.dll
+  - ARCH: x86
+    GENERATOR: "Visual Studio 15 2017"
+    LIBNAME: OpenAL32.dll
+matrix:
+  fast_finish: true
 build_script:
-    - cd build
-    - cmake -G"%GEN%" -DALSOFT_REQUIRE_WINMM=ON -DALSOFT_REQUIRE_DSOUND=ON -DALSOFT_REQUIRE_WASAPI=ON -DALSOFT_EMBED_HRTF_DATA=YES ..
-    - cmake --build . --config %CFG% --clean-first
+- cmd: >-
+    "C:\Program Files (x86)\Microsoft Visual Studio\2017\Community\VC\Auxiliary\Build\vcvarsall.bat" %ARCH%
 
+    cd build
+
+    cmake -G "%GENERATOR%" -DALSOFT_REQUIRE_WINMM=ON -DALSOFT_REQUIRE_DSOUND=ON -DALSOFT_REQUIRE_WASAPI=ON -DALSOFT_EMBED_HRTF_DATA=ON ..
+
+    cmake --build . --config Release
+
+    aws s3 cp Release\OpenAL32.dll s3://build.lwjgl.org/nightly/windows/%ARCH%/%LIBNAME% %S3_CONFIG_VOLATILE%
+
+    cd ..
+
+    git log --first-parent --pretty=format:%GIT_FORMAT% HEAD~2..HEAD~1 > revision.git
+
+    aws s3 cp revision.git s3://build.lwjgl.org/nightly/windows/%ARCH%/%LIBNAME%.git %S3_CONFIG_VOLATILE%
+test: off
+notifications:
+- provider: Email
+  to:
+  - iotsakp@gmail.com
+  subject: OpenAL-Soft CI
+  on_build_success: true
+  on_build_failure: true
+  on_build_status_changed: true

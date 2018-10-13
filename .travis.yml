@@ -1,66 +1,38 @@
+dist: trusty
+sudo: false
+git:
+  depth: 3
+env:
+  global:
+  - secure: "L/pzocpnCGawVmTwPt+Y8xxTryePptOdkNM4NvJLVsyH5aIz+026TFwZ2lR01mBjhclO/CbdyaW774PRq4XE4qN/huSs35fXbyw9z6NoF+QgC99MrbNVvEsXdERY/3s+HLw+KgtYbDnxaicPutq65dmJgOipH7vYACyKPpgAiTg="
+  - secure: "Wv8lNh+gdT5sq2prOl1xVd5f0yMBJRxzs2l+x/J8XwtEfLNvof9HTX7hfkpF8/r6wpM8GtqGOHsq3XMHGwrIrX1TaYrDGPlQ6BXb07nWW+G6YIzjwTK8df+VRd5lGeJol+HW7TYstC+Hn82UAYjkoUCI86yHxNgImftrMT6ez6A="
 language: c
-matrix:
-  include:
-    - os: linux
-      dist: trusty
-    - os: linux
-      dist: trusty
-      env:
-        - BUILD_ANDROID=true
-    - os: osx
-sudo: required
-install:
-  - >
-    if [[ "${TRAVIS_OS_NAME}" == "linux" && -z "${BUILD_ANDROID}" ]]; then
-      # Install pulseaudio, portaudio, ALSA, JACK dependencies for
-      # corresponding backends.
-      # Install Qt5 dependency for alsoft-config.
-      sudo apt-get install -qq \
-        libpulse-dev \
-        portaudio19-dev \
-        libasound2-dev \
-        libjack-dev \
-        qtbase5-dev
-    fi
-  - >
-    if [[ "${TRAVIS_OS_NAME}" == "linux" && "${BUILD_ANDROID}" == "true" ]]; then
-      curl -o ~/android-ndk.zip https://dl.google.com/android/repository/android-ndk-r15-linux-x86_64.zip
-      unzip -q ~/android-ndk.zip -d ~ \
-        'android-ndk-r15/build/cmake/*' \
-        'android-ndk-r15/build/core/toolchains/arm-linux-androideabi-*/*' \
-        'android-ndk-r15/platforms/android-14/arch-arm/*' \
-        'android-ndk-r15/source.properties' \
-        'android-ndk-r15/sources/cxx-stl/gnu-libstdc++/4.9/libs/armeabi-v7a/*' \
-        'android-ndk-r15/sources/cxx-stl/gnu-libstdc++/4.9/include/*' \
-        'android-ndk-r15/sysroot/*' \
-        'android-ndk-r15/toolchains/arm-linux-androideabi-4.9/prebuilt/linux-x86_64/*' \
-        'android-ndk-r15/toolchains/llvm/prebuilt/linux-x86_64/*'
-    fi
+compiler: gcc
+
+addons:
+  apt:
+#    sources:
+#    - ubuntu-toolchain-r-test
+    packages:
+#    - gcc-7
+    - cmake
+    - cmake-data
+    - libpulse-dev
+    - portaudio19-dev
+    - libasound2-dev
+    - libjack-dev
+
+before_install:
+- pip install --user awscli
+- export PATH=$PATH:$HOME/.local/bin
+
 script:
-  - >
-    if [[ "${TRAVIS_OS_NAME}" == "linux" && -z "${BUILD_ANDROID}" ]]; then
-      cmake \
-        -DALSOFT_REQUIRE_ALSA=ON \
-        -DALSOFT_REQUIRE_OSS=ON \
-        -DALSOFT_REQUIRE_PORTAUDIO=ON \
-        -DALSOFT_REQUIRE_PULSEAUDIO=ON \
-        -DALSOFT_REQUIRE_JACK=ON \
-        -DALSOFT_EMBED_HRTF_DATA=YES \
-        .
-    fi
-  - >
-    if [[ "${TRAVIS_OS_NAME}" == "linux" && "${BUILD_ANDROID}" == "true" ]]; then
-      cmake \
-        -DCMAKE_TOOLCHAIN_FILE=~/android-ndk-r15/build/cmake/android.toolchain.cmake \
-        -DALSOFT_REQUIRE_OPENSL=ON \
-        -DALSOFT_EMBED_HRTF_DATA=YES \
-        .
-    fi
-  - >
-    if [[ "${TRAVIS_OS_NAME}" == "osx" ]]; then
-      cmake \
-        -DALSOFT_REQUIRE_COREAUDIO=ON \
-        -DALSOFT_EMBED_HRTF_DATA=YES \
-        .
-    fi
-  - make -j2
+- mkdir LINUX
+- cd LINUX
+#- CC="gcc-7" cmake -DALSOFT_REQUIRE_ALSA=ON -DALSOFT_REQUIRE_OSS=ON -DALSOFT_REQUIRE_PORTAUDIO=ON -DALSOFT_REQUIRE_PULSEAUDIO=ON -DALSOFT_REQUIRE_JACK=ON -DALSOFT_EMBED_HRTF_DATA=YES -DCMAKE_BUILD_TYPE=Release -DCMAKE_C_FLAGS="-U_FORTIFY_SOURCE -D_FORTIFY_SOURCE=0" -DCMAKE_SHARED_LINKER_FLAGS=-Wl,--wrap,memcpy ..
+- cmake -DALSOFT_REQUIRE_ALSA=ON -DALSOFT_REQUIRE_OSS=ON -DALSOFT_REQUIRE_PORTAUDIO=ON -DALSOFT_REQUIRE_PULSEAUDIO=ON -DALSOFT_REQUIRE_JACK=ON -DALSOFT_EMBED_HRTF_DATA=YES -DCMAKE_BUILD_TYPE=Release -DCMAKE_C_FLAGS="-U_FORTIFY_SOURCE -D_FORTIFY_SOURCE=0" -DCMAKE_SHARED_LINKER_FLAGS=-Wl,--wrap,memcpy ..
+- cmake --build .
+- strip libopenal.so
+- "aws s3 cp libopenal.so s3://build.lwjgl.org/nightly/linux/x64/libopenal.so --acl public-read --storage-class REDUCED_REDUNDANCY --cache-control \"public, must-revalidate, proxy-revalidate, max-age=0\""
+- "git log --first-parent --pretty=format:%H HEAD~2..HEAD~1 > revision.git"
+- "aws s3 cp revision.git s3://build.lwjgl.org/nightly/linux/x64/libopenal.so.git --acl public-read --storage-class REDUCED_REDUNDANCY --cache-control \"public, must-revalidate, proxy-revalidate, max-age=0\""

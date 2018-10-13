@@ -41,16 +41,16 @@ OPTION(ALSOFT_DLOPEN  "Check for the dlopen API for loading optional libs"  ON)
 
 OPTION(ALSOFT_WERROR  "Treat compile warnings as errors"      OFF)
 
-OPTION(ALSOFT_UTILS          "Build and install utility programs"         ON)
-OPTION(ALSOFT_NO_CONFIG_UTIL "Disable building the alsoft-config utility" OFF)
+OPTION(ALSOFT_UTILS          "Build and install utility programs"         OFF)
+OPTION(ALSOFT_NO_CONFIG_UTIL "Disable building the alsoft-config utility" ON)
 
-OPTION(ALSOFT_EXAMPLES  "Build and install example programs"  ON)
-OPTION(ALSOFT_TESTS     "Build and install test programs"     ON)
+OPTION(ALSOFT_EXAMPLES  "Build and install example programs"  OFF)
+OPTION(ALSOFT_TESTS     "Build and install test programs"     OFF)
 
-OPTION(ALSOFT_CONFIG "Install alsoft.conf sample configuration file" ON)
-OPTION(ALSOFT_HRTF_DEFS "Install HRTF definition files" ON)
-OPTION(ALSOFT_AMBDEC_PRESETS "Install AmbDec preset files" ON)
-OPTION(ALSOFT_INSTALL "Install headers and libraries" ON)
+OPTION(ALSOFT_CONFIG "Install alsoft.conf sample configuration file" OFF)
+OPTION(ALSOFT_HRTF_DEFS "Install HRTF definition files" OFF)
+OPTION(ALSOFT_AMBDEC_PRESETS "Install AmbDec preset files" OFF)
+OPTION(ALSOFT_INSTALL "Install headers and libraries" OFF)
 
 if(DEFINED SHARE_INSTALL_DIR)
     message(WARNING "SHARE_INSTALL_DIR is deprecated.  Use the variables provided by the GNUInstallDirs module instead")
@@ -69,7 +69,7 @@ SET(LINKER_FLAGS )
 SET(EXTRA_LIBS )
 
 IF(WIN32)
-    SET(CPP_DEFS ${CPP_DEFS} _WIN32 _WIN32_WINNT=0x0502)
+    SET(CPP_DEFS ${CPP_DEFS} _WIN32 _WIN32_WINNT=0x0501)
 
     OPTION(ALSOFT_BUILD_ROUTER  "Build the router (EXPERIMENTAL; creates OpenAL32.dll and soft_oal.dll)"  OFF)
 
@@ -294,7 +294,7 @@ IF(MSVC)
         MESSAGE(STATUS "Using DirectX SDK directory: ${DXSDK_DIR}")
     ENDIF()
 
-    OPTION(FORCE_STATIC_VCRT "Force /MT for static VC runtimes" OFF)
+    OPTION(FORCE_STATIC_VCRT "Force /MT for static VC runtimes" ON)
     IF(FORCE_STATIC_VCRT)
         FOREACH(flag_var
                 CMAKE_C_FLAGS CMAKE_C_FLAGS_DEBUG CMAKE_C_FLAGS_RELEASE
@@ -546,7 +546,7 @@ IF(HAVE_INTRIN_H)
 ENDIF()
 
 CHECK_SYMBOL_EXISTS(sysconf          unistd.h HAVE_SYSCONF)
-CHECK_SYMBOL_EXISTS(aligned_alloc    stdlib.h HAVE_ALIGNED_ALLOC)
+#CHECK_SYMBOL_EXISTS(aligned_alloc    stdlib.h HAVE_ALIGNED_ALLOC)
 CHECK_SYMBOL_EXISTS(posix_memalign   stdlib.h HAVE_POSIX_MEMALIGN)
 CHECK_SYMBOL_EXISTS(_aligned_malloc  malloc.h HAVE__ALIGNED_MALLOC)
 CHECK_SYMBOL_EXISTS(proc_pidpath     libproc.h HAVE_PROC_PIDPATH)
@@ -621,7 +621,7 @@ ENDIF()
 
 # Check if we have Windows headers
 SET(OLD_REQUIRED_DEFINITIONS ${CMAKE_REQUIRED_DEFINITIONS})
-SET(CMAKE_REQUIRED_DEFINITIONS ${CMAKE_REQUIRED_DEFINITIONS} -D_WIN32_WINNT=0x0502)
+SET(CMAKE_REQUIRED_DEFINITIONS ${CMAKE_REQUIRED_DEFINITIONS} -D_WIN32_WINNT=0x0501)
 CHECK_INCLUDE_FILE(windows.h HAVE_WINDOWS_H)
 SET(CMAKE_REQUIRED_DEFINITIONS ${OLD_REQUIRED_DEFINITIONS})
 UNSET(OLD_REQUIRED_DEFINITIONS)
@@ -727,7 +727,7 @@ CHECK_SYMBOL_EXISTS(getopt unistd.h HAVE_GETOPT)
 CHECK_INCLUDE_FILE(stdint.h HAVE_STDINT_H)
 IF(NOT HAVE_STDINT_H)
     IF(HAVE_WINDOWS_H)
-        CHECK_C_SOURCE_COMPILES("#define _WIN32_WINNT 0x0502
+        CHECK_C_SOURCE_COMPILES("#define _WIN32_WINNT 0x0501
                                  #include <windows.h>
                                  __int64 foo;
                                  int main() {return 0;}" HAVE___INT64)
@@ -760,6 +760,9 @@ SET(COMMON_OBJS
     common/uintmap.c
     common/uintmap.h
 )
+if (UNIX)
+	list(APPEND COMMON_OBJS common/wrap_memcpy.c)
+endif()
 SET(OPENAL_OBJS
     OpenAL32/Include/bs2b.h
     OpenAL32/Include/alMain.h
@@ -1074,7 +1077,7 @@ OPTION(ALSOFT_REQUIRE_DSOUND "Require DirectSound backend" OFF)
 OPTION(ALSOFT_REQUIRE_WASAPI "Require WASAPI backend" OFF)
 IF(HAVE_WINDOWS_H)
     SET(OLD_REQUIRED_DEFINITIONS ${CMAKE_REQUIRED_DEFINITIONS})
-    SET(CMAKE_REQUIRED_DEFINITIONS ${CMAKE_REQUIRED_DEFINITIONS} -D_WIN32_WINNT=0x0502)
+    SET(CMAKE_REQUIRED_DEFINITIONS ${CMAKE_REQUIRED_DEFINITIONS} -D_WIN32_WINNT=0x0501)
 
     # Check MMSystem backend
     CHECK_INCLUDE_FILES("windows.h;mmsystem.h" HAVE_MMSYSTEM_H)
