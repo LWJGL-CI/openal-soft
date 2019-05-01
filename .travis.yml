@@ -17,22 +17,29 @@ addons:
 #    - gcc-7
     - cmake
     - cmake-data
-    - libpulse-dev
-    - portaudio19-dev
-    - libasound2-dev
-    - libjack-dev
+    - gcc-arm-linux-gnueabihf
+    - g++-arm-linux-gnueabihf
 
 before_install:
 - pip install --user awscli
 - export PATH=$PATH:$HOME/.local/bin
+- sudo sed -i 's/deb http/deb [arch=amd64,i386] http/' /etc/apt/sources.list
+- cat /etc/apt/sources.list
+- sudo grep "ubuntu.com/ubuntu" /etc/apt/sources.list | sudo tee /etc/apt/sources.list.d/ports.list
+- sudo sed -i 's/amd64,i386/armhf,arm64/' /etc/apt/sources.list.d/ports.list
+- sudo sed -i 's#http://.*/ubuntu#http://ports.ubuntu.com/ubuntu-ports#' /etc/apt/sources.list.d/ports.list
+- cat /etc/apt/sources.list.d/ports.list
+- sudo dpkg --add-architecture armhf
+- sudo apt-get update || true
+- sudo apt-get -yq --no-install-suggests --no-install-recommends install libpulse-dev:armhf portaudio19-dev:armhf libasound2-dev:armhf libjack-dev:armhf
 
 script:
 - mkdir LINUX
 - cd LINUX
 #- CC="gcc-7" cmake -DALSOFT_REQUIRE_ALSA=ON -DALSOFT_REQUIRE_OSS=ON -DALSOFT_REQUIRE_PORTAUDIO=ON -DALSOFT_REQUIRE_PULSEAUDIO=ON -DALSOFT_REQUIRE_JACK=ON -DALSOFT_EMBED_HRTF_DATA=YES -DCMAKE_BUILD_TYPE=Release -DCMAKE_C_FLAGS="-U_FORTIFY_SOURCE -D_FORTIFY_SOURCE=0" -DCMAKE_SHARED_LINKER_FLAGS=-Wl,--wrap,memcpy ..
-- cmake -DALSOFT_REQUIRE_ALSA=ON -DALSOFT_REQUIRE_OSS=ON -DALSOFT_REQUIRE_PORTAUDIO=ON -DALSOFT_REQUIRE_PULSEAUDIO=ON -DALSOFT_REQUIRE_JACK=ON -DALSOFT_EMBED_HRTF_DATA=YES -DCMAKE_BUILD_TYPE=Release -DCMAKE_C_FLAGS="-U_FORTIFY_SOURCE -D_FORTIFY_SOURCE=0" -DCMAKE_SHARED_LINKER_FLAGS=-Wl,--wrap,memcpy ..
+- cmake -DCMAKE_TOOLCHAIN_FILE=../XCompile-arm.txt -DHOST=arm-linux-gnueabihf -DALSOFT_REQUIRE_ALSA=ON -DALSOFT_REQUIRE_OSS=ON -DALSOFT_REQUIRE_PORTAUDIO=ON -DALSOFT_REQUIRE_PULSEAUDIO=ON -DALSOFT_REQUIRE_JACK=ON -DALSOFT_EMBED_HRTF_DATA=YES -DCMAKE_BUILD_TYPE=Release -DCMAKE_C_FLAGS="-U_FORTIFY_SOURCE -D_FORTIFY_SOURCE=0" -DCMAKE_SHARED_LINKER_FLAGS=-Wl,--wrap,memcpy ..
 - cmake --build .
-- strip libopenal.so
-- "aws s3 cp libopenal.so s3://build.lwjgl.org/nightly/linux/x64/libopenal.so --acl public-read --storage-class REDUCED_REDUNDANCY --cache-control \"public, must-revalidate, proxy-revalidate, max-age=0\""
+- arm-linux-gnueabihf-strip libopenal.so
+- "aws s3 cp libopenal.so s3://build.lwjgl.org/nightly/linux/arm32/libopenal.so --acl public-read --storage-class REDUCED_REDUNDANCY --cache-control \"public, must-revalidate, proxy-revalidate, max-age=0\""
 - "git log --first-parent --pretty=format:%H HEAD~2..HEAD~1 > revision.git"
-- "aws s3 cp revision.git s3://build.lwjgl.org/nightly/linux/x64/libopenal.so.git --acl public-read --storage-class REDUCED_REDUNDANCY --cache-control \"public, must-revalidate, proxy-revalidate, max-age=0\""
+- "aws s3 cp revision.git s3://build.lwjgl.org/nightly/linux/arm32/libopenal.so.git --acl public-read --storage-class REDUCED_REDUNDANCY --cache-control \"public, must-revalidate, proxy-revalidate, max-age=0\""
