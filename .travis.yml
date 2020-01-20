@@ -119,6 +119,41 @@ matrix:
     - "aws s3 cp revision.git s3://build.lwjgl.org/nightly/linux/arm64/libopenal.so.git $S3_PARAMS"
 
   # -----------------
+  - name: "Linux mips64"
+  # -----------------
+    dist: xenial
+    language: c
+    compiler: gcc
+
+    addons:
+      apt:
+        packages:
+        - cmake
+        - cmake-data
+        - gcc-5-mips64el-linux-gnuabi64
+        - g++-5-mips64el-linux-gnuabi64
+        - libc6-dev-mips64el-cross
+
+    before_install:
+    - pip install --user awscli
+    - export PATH=$PATH:$HOME/.local/bin
+    - sudo rm -rf /etc/apt/sources.list
+    - sudo sh -c "echo 'deb http://deb.debian.org/debian stretch main' >> /etc/apt/sources.list"
+    - sudo dpkg --add-architecture mips64el
+    - sudo apt-get update || true
+    - sudo apt-get -yq --allow-unauthenticated --no-install-suggests --no-install-recommends install libpulse-dev:mips64el portaudio19-dev:mips64el libasound2-dev:mips64el libjack-dev:mips64el -o Dpkg::Options::="--force-overwrite"
+
+    script:
+    - mkdir LINUX
+    - cd LINUX
+    - "cmake -DCMAKE_TOOLCHAIN_FILE=../XCompile-arm.txt -DHOST=mips64el-linux-gnuabi64 $LINUX_CMAKE_PARAMS -DCMAKE_C_FLAGS=\"-U_FORTIFY_SOURCE -D_FORTIFY_SOURCE=0\" .."
+    - cmake --build .
+    - mips64el-linux-gnuabi64-strip libopenal.so
+    - "git log --first-parent --pretty=format:%H HEAD~2..HEAD~1 > revision.git"
+    - "aws s3 cp libopenal.so s3://build.lwjgl.org/nightly/linux/mips64/libopenal.so $S3_PARAMS"
+    - "aws s3 cp revision.git s3://build.lwjgl.org/nightly/linux/mips64/libopenal.so.git $S3_PARAMS"
+
+  # -----------------
   - name: "macOS"
   # -----------------
     language: objective-c
