@@ -324,7 +324,12 @@ void DSoundPlayback::open(std::string_view name)
     if(SUCCEEDED(hr))
         hr = DirectSoundCreate(guid, al::out_ptr(ds), nullptr);
     if(SUCCEEDED(hr))
-        hr = ds->SetCooperativeLevel(GetForegroundWindow(), DSSCL_PRIORITY);
+    {
+        HWND hWnd = GetForegroundWindow();
+        if (hWnd == NULL)
+            hWnd = GetDesktopWindow();
+        hr = ds->SetCooperativeLevel(hWnd, DSSCL_PRIORITY);
+	}
     if(FAILED(hr))
         throw al::backend_exception{al::backend_error::DeviceError, "Device init failed: {:#x}",
             as_unsigned(hr)};
