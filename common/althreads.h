@@ -9,13 +9,10 @@
 #define WIN32_LEAN_AND_MEAN
 #include <windows.h>
 
-#elif defined(__APPLE__)
+#else
 
 #include <pthread.h>
 
-#else
-
-#include <threads.h>
 #endif
 
 #include "albit.h"
@@ -79,7 +76,7 @@ public:
     [[nodiscard]]
     auto get() const noexcept -> T { return from_ptr(TlsGetValue(mTss)); }
 
-#elif defined(__APPLE__)
+#else
 
     pthread_key_t mTss{};
 
@@ -105,31 +102,6 @@ public:
     [[nodiscard]]
     auto get() const noexcept -> T { return from_ptr(pthread_getspecific(mTss)); }
 
-#else
-
-    tss_t mTss{};
-
-public:
-    tss()
-    {
-        if(int res{tss_create(&mTss, nullptr)}; res != thrd_success)
-            throw std::runtime_error{"al::tss::tss()"};
-    }
-    explicit tss(const T &init) : tss{}
-    {
-        if(int res{tss_set(mTss, to_ptr(init))}; res != thrd_success)
-            throw std::runtime_error{"al::tss::tss(T)"};
-    }
-    ~tss() { tss_delete(mTss); }
-
-    void set(const T &value) const
-    {
-        if(int res{tss_set(mTss, to_ptr(value))}; res != thrd_success)
-            throw std::runtime_error{"al::tss::set(T)"};
-    }
-
-    [[nodiscard]]
-    auto get() const noexcept -> T { return from_ptr(tss_get(mTss)); }
 #endif /* _WIN32 */
 
     tss(const tss&) = delete;
