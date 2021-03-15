@@ -692,7 +692,14 @@ struct EventManager {
     static void RemoveDevice(uint32_t id);
     static auto GetDeviceList() noexcept { return std::span{sList}; }
 
-    ~EventManager() { if(mLoop) mLoop.stop(); }
+    ~EventManager()
+    {
+        /* LWJGL: Use the explicit cleanup path so listener hooks are removed and
+         * zeroed before global/static destruction. This avoids exit-time crashes
+         * with newer PipeWire versions leaving mCoreListener in stale list state.
+         */
+        kill();
+    }
 
     auto init() -> bool;
 
