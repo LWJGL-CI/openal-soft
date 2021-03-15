@@ -242,7 +242,7 @@ inline const FuncExport alcFunctions[]{
 
     DECL(alGetErrorDirect),
     DECL(alIsExtensionPresentDirect),
-    DECL(alGetProcAddress),
+    DECL(alGetProcAddressDirect),
     DECL(alGetEnumValueDirect),
 
     DECL(alListeneriDirect),
@@ -340,7 +340,12 @@ inline const FuncExport alcFunctions[]{
     DECL(alGetStringiDirectSOFT),
 
     DECL(alBufferDataStaticDirect),
+
     DECL(alBufferCallbackDirectSOFT),
+    DECL(alGetBufferPtrDirectSOFT),
+    DECL(alGetBuffer3PtrDirectSOFT),
+    DECL(alGetBufferPtrvDirectSOFT),
+
     DECL(alBufferSubDataDirectSOFT),
     DECL(alBufferStorageDirectSOFT),
     DECL(alMapBufferDirectSOFT),
@@ -364,6 +369,8 @@ inline const FuncExport alcFunctions[]{
 
     DECL(alEventControlDirectSOFT),
     DECL(alEventCallbackDirectSOFT),
+    DECL(alGetPointerDirectSOFT),
+    DECL(alGetPointervDirectSOFT),
 
     DECL(alDebugMessageCallbackDirectEXT),
     DECL(alDebugMessageInsertDirectEXT),
