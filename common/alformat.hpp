@@ -8,7 +8,7 @@
 /* On macOS, std::format requires std::to_chars, which isn't available prior
  * to macOS 13.3.
  */
-#if defined(MAC_OS_X_VERSION_MIN_REQUIRED) && MAC_OS_X_VERSION_MIN_REQUIRED < 130300
+#if defined(__linux__) || (defined(MAC_OS_X_VERSION_MIN_REQUIRED) && MAC_OS_X_VERSION_MIN_REQUIRED < 130300)
 #include "fmt/format.h"
 
 namespace al {
