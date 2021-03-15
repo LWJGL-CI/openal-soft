@@ -4045,7 +4045,7 @@ END_API_FUNC
  ************************************************/
 
 /** Reopens the given device output, using the specified name and attribute list. */
-FORCE_ALIGN ALCboolean ALC_APIENTRY alcReopenDeviceSOFT(ALCdevice *device,
+FORCE_ALIGN ALC_API ALCboolean ALC_APIENTRY alcReopenDeviceSOFT(ALCdevice *device,
     const ALCchar *deviceName, const ALCint *attribs)
 START_API_FUNC
 {

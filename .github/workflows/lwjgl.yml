@@ -1,0 +1,209 @@
+name: LWJGL Build
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - master
+
+env:
+  AWS_DEFAULT_REGION: us-east-1
+  AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+  AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+  S3_PARAMS: --cache-control "public,must-revalidate,proxy-revalidate,max-age=0"
+
+jobs:
+  linux:
+    name: Linux
+    runs-on: ubuntu-latest
+    container:
+      image: centos:7
+    strategy:
+      fail-fast: false
+      matrix:
+        ARCH: [x64]
+        include:
+          - ARCH: x64
+            PACKAGES: alsa-lib-devel pulseaudio-libs-devel portaudio-devel jack-audio-connection-kit-devel dbus-devel #pipewire-devel
+    steps:
+      - run: |
+          yum -y install https://packages.endpointdev.com/rhel/7/os/x86_64/endpoint-repo.x86_64.rpm
+          yum -y install git
+        name: Upgrade git
+      - uses: actions/checkout@v3
+        with:
+          fetch-depth: 3
+      - run: |
+          yum -y install epel-release
+          yum -y update
+        name: Configure yum
+      - run: |
+          yum -y install centos-release-scl
+          yum -y install devtoolset-11-gcc-c++
+          yum -y install cmake3 awscli
+        name: Install build dependencies
+      - run: yum -y install ${{matrix.PACKAGES}}
+        name: Install OpenAL Soft dependencies
+        #./autogen.sh -Dprefix=/usr -Dtests=disabled -Dexamples=disabled -Dsession-managers=[] -Dgstreamer=disabled -Davb=disabled -Dv4l2=disabled
+      - run: |
+          pip3 install meson
+          yum -y install ninja-build which libudev-devel
+          git clone --branch 0.3.50 --depth=1 https://gitlab.freedesktop.org/pipewire/pipewire.git
+          cd pipewire
+          source scl_source enable devtoolset-11 || true
+          ./autogen.sh -Dprefix=/usr -Dtests=disabled -Dexamples=disabled -Dgstreamer=disabled -Dv4l2=disabled -Dpipewire-v4l2=disabled
+          make
+          make install
+        name: Build & install recent pipewire
+      - run: |
+          source scl_source enable devtoolset-11 || true
+          cmake3 -B build -DALSOFT_REQUIRE_RTKIT=ON -DALSOFT_REQUIRE_ALSA=ON -DALSOFT_REQUIRE_OSS=ON -DALSOFT_REQUIRE_PORTAUDIO=ON -DALSOFT_REQUIRE_PULSEAUDIO=ON -DALSOFT_REQUIRE_JACK=ON -DALSOFT_REQUIRE_PIPEWIRE=ON -DALSOFT_EMBED_HRTF_DATA=YES -DCMAKE_BUILD_TYPE=Release -DCMAKE_C_FLAGS="-U_FORTIFY_SOURCE -D_FORTIF=Y_SOURCE=0"
+        name: Configure build
+      - run: |
+          source scl_source enable devtoolset-11 || true
+          cmake3 --build build --parallel
+          strip build/libopenal.so
+        name: Build
+      - run: aws s3 cp build/libopenal.so s3://lwjgl-build/nightly/linux/${{matrix.ARCH}}/ $S3_PARAMS
+        name: Upload artifact
+      - run: |
+          git config --global --add safe.directory $PWD
+          git log --first-parent --pretty=format:%H HEAD~2..HEAD~1 > libopenal.so.git
+          aws s3 cp libopenal.so.git s3://lwjgl-build/nightly/linux/${{matrix.ARCH}}/ $S3_PARAMS
+        name: Upload git revision
+
+  linux-cross:
+    name: Linux Cross
+    runs-on: ubuntu-latest
+    container:
+      image: ubuntu:18.04
+    strategy:
+      fail-fast: false
+      matrix:
+        ARCH: [arm32, arm64]
+        include:
+          - ARCH: arm32
+            CROSS_ARCH: armhf
+            PACKAGES: gcc-arm-linux-gnueabihf g++-arm-linux-gnueabihf libc6-dev-armhf-cross
+            CROSS_PACKAGES: libpulse-dev:armhf portaudio19-dev:armhf libasound2-dev:armhf libjack-dev:armhf libdbus-1-dev:armhf #libpipewire-0.3-dev:armhf
+            CC: CC=arm-linux-gnueabihf-gcc CXX=arm-linux-gnueabihf-g++
+            CMAKE_PARAMS: -DCMAKE_TOOLCHAIN_FILE=../XCompile-arm.txt -DHOST=arm-linux-gnueabihf -DPROCESSOR=arm
+            STRIP: arm-linux-gnueabihf-strip
+          - ARCH: arm64
+            CROSS_ARCH: arm64
+            PACKAGES: gcc-aarch64-linux-gnu g++-aarch64-linux-gnu libc6-dev-arm64-cross
+            CROSS_PACKAGES: libpulse-dev:arm64 portaudio19-dev:arm64 libasound2-dev:arm64 libjack-dev:arm64 libdbus-1-dev:arm64 #libpipewire-0.3-dev:arm64
+            CC: CC=aarch64-linux-gnu-gcc CXX=aarch64-linux-gnu-g++
+            CMAKE_PARAMS: -DCMAKE_TOOLCHAIN_FILE=../XCompile-arm.txt -DHOST=aarch64-linux-gnu -DPROCESSOR=aarch64
+            STRIP: aarch64-linux-gnu-strip
+    steps:
+      - run: |
+          apt-get -y update
+          apt-get -y install software-properties-common wget
+          apt-get -y install --reinstall ca-certificates
+          apt-get -y update
+          apt-get -y upgrade
+          wget https://apt.kitware.com/keys/kitware-archive-latest.asc
+          apt-key add kitware-archive-latest.asc
+          add-apt-repository -y 'deb https://apt.kitware.com/ubuntu/ bionic main'
+          add-apt-repository -y ppa:git-core/ppa
+          apt-get -y update
+          DEBIAN_FRONTEND=noninteractive apt-get -yq install awscli git
+        name: Upgrade git
+      - uses: actions/checkout@v3
+        with:
+          fetch-depth: 3
+      - run: DEBIAN_FRONTEND=noninteractive apt-get -yq install cmake ${{matrix.PACKAGES}}
+        name: Install dependencies
+      - run: |
+          sed -i 's/deb http/deb [arch=amd64,i386] http/' /etc/apt/sources.list
+          grep "ubuntu.com/ubuntu" /etc/apt/sources.list | tee /etc/apt/sources.list.d/ports.list
+          sed -i 's/amd64,i386/armhf,arm64/' /etc/apt/sources.list.d/ports.list
+          sed -i 's#http://.*/ubuntu#http://ports.ubuntu.com/ubuntu-ports#' /etc/apt/sources.list.d/ports.list
+          dpkg --add-architecture ${{matrix.CROSS_ARCH}}
+          apt-get update || true
+        name: Prepare cross-compilation
+      - run: apt-get -yq --allow-unauthenticated --no-install-suggests --no-install-recommends install ${{matrix.CROSS_PACKAGES}} -o Dpkg::Options::="--force-overwrite"
+        name: Install cross-compilation dependencies
+      - run: ${{matrix.CC}} cmake -B build -DALSOFT_REQUIRE_RTKIT=ON -DALSOFT_REQUIRE_ALSA=ON -DALSOFT_REQUIRE_OSS=ON -DALSOFT_REQUIRE_PORTAUDIO=ON -DALSOFT_REQUIRE_PULSEAUDIO=ON -DALSOFT_REQUIRE_JACK=ON -DALSOFT_EMBED_HRTF_DATA=YES -DCMAKE_BUILD_TYPE=Release -DCMAKE_C_FLAGS="-U_FORTIFY_SOURCE -D_FORTIFY_SOURCE=0" ${{matrix.CMAKE_PARAMS}}
+        name: Configure build
+        #-DALSOFT_REQUIRE_PIPEWIRE=ON
+      - run: |
+          cmake --build build --parallel
+          ${{matrix.STRIP}} build/libopenal.so
+        name: Build
+      - run: aws s3 cp build/libopenal.so s3://lwjgl-build/nightly/linux/${{matrix.ARCH}}/ $S3_PARAMS
+        name: Upload artifact
+      - run: |
+          git config --global --add safe.directory $(pwd)
+          git log --first-parent --pretty=format:%H HEAD~2..HEAD~1 > libopenal.so.git
+          aws s3 cp libopenal.so.git s3://lwjgl-build/nightly/linux/${{matrix.ARCH}}/ $S3_PARAMS
+        name: Upload git revision
+
+  macos:
+    name: macOS
+    runs-on: macos-latest
+    strategy:
+      matrix:
+        ARCH: [x64, arm64]
+        include:
+          - ARCH: x64
+            CMAKE_PARAMS: -DCMAKE_OSX_DEPLOYMENT_TARGET=10.9
+          - ARCH: arm64
+            CMAKE_PARAMS: -DCMAKE_OSX_DEPLOYMENT_TARGET=11.0 -DCMAKE_OSX_ARCHITECTURES=arm64
+    steps:
+      - uses: actions/checkout@v3
+        with:
+          fetch-depth: 3
+      - run: |
+          cd build
+          cmake -DALSOFT_REQUIRE_COREAUDIO=ON -DALSOFT_EMBED_HRTF_DATA=YES -DCMAKE_BUILD_TYPE=Release ${{matrix.CMAKE_PARAMS}} ..
+        name: Configure build
+      - run: |
+          cd build
+          cmake --build .
+          strip -u -r libopenal.dylib
+        name: Build
+      - run: aws s3 cp build/libopenal.dylib s3://lwjgl-build/nightly/macosx/${{matrix.ARCH}}/ $S3_PARAMS
+        name: Upload artifact
+      - run: |
+          git log --first-parent --pretty=format:%H HEAD~2..HEAD~1 > libopenal.dylib.git
+          aws s3 cp libopenal.dylib.git s3://lwjgl-build/nightly/macosx/${{matrix.ARCH}}/ $S3_PARAMS
+        name: Upload git revision
+
+  windows:
+    name: Windows
+    runs-on: windows-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        ARCH: [x86, x64, arm64]
+        include:
+          - ARCH: x86
+            PLATFORM: Win32
+          - ARCH: x64
+            PLATFORM: x64
+          - ARCH: arm64
+            PLATFORM: ARM64
+    steps:
+      - uses: actions/checkout@v3
+        with:
+          fetch-depth: 3
+      - run: |
+          cd build
+          cmake -G "Visual Studio 17 2022" -A ${{matrix.PLATFORM}} -DALSOFT_REQUIRE_WINMM=ON -DALSOFT_REQUIRE_DSOUND=ON -DALSOFT_REQUIRE_WASAPI=ON -DALSOFT_EMBED_HRTF_DATA=ON -DFORCE_STATIC_VCRT=ON -DALSOFT_EAX=OFF ..
+        shell: cmd
+        name: Configure build
+      - run: |
+          cd build
+          cmake --build . --config Release
+        shell: cmd
+        name: Build
+      - run: aws s3 cp build\Release\OpenAL32.dll s3://lwjgl-build/nightly/windows/${{matrix.ARCH}}/OpenAL.dll ${{env.S3_PARAMS}}
+        shell: cmd
+        name: Upload artifact
+      - run: |
+          git log --first-parent --pretty=format:%%H HEAD~2..HEAD~1 > OpenAL.dll.git
+          aws s3 cp OpenAL.dll.git s3://lwjgl-build/nightly/windows/${{matrix.ARCH}}/ ${{env.S3_PARAMS}}
+        shell: cmd
+        name: Upload git revision
