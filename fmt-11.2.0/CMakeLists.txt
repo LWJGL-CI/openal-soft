@@ -136,6 +136,16 @@ set_target_properties(alsoft.fmt PROPERTIES ${ALSOFT_STD_VERSION_PROPS}
   EXCLUDE_FROM_ALL TRUE)
 
 if (MSVC)
+#  foreach(flag_var
+#        CMAKE_C_FLAGS CMAKE_C_FLAGS_DEBUG CMAKE_C_FLAGS_RELEASE
+#        CMAKE_C_FLAGS_MINSIZEREL CMAKE_C_FLAGS_RELWITHDEBINFO
+#        CMAKE_CXX_FLAGS CMAKE_CXX_FLAGS_DEBUG CMAKE_CXX_FLAGS_RELEASE
+#        CMAKE_CXX_FLAGS_MINSIZEREL CMAKE_CXX_FLAGS_RELWITHDEBINFO)
+#    if(${flag_var} MATCHES "/MD")
+#        string(REGEX REPLACE "/MD" "/MT" ${flag_var} "${${flag_var}}")
+#    endif()
+#  endforeach(flag_var)
+
   # Unicode support requires compiling with /utf-8.
   target_compile_options(alsoft.fmt PUBLIC $<$<AND:$<COMPILE_LANGUAGE:CXX>,$<CXX_COMPILER_ID:MSVC>>:/utf-8>)
 endif ()
