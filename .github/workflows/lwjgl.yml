@@ -44,6 +44,14 @@ jobs:
             CMAKE_PARAMS: -DCMAKE_TOOLCHAIN_FILE=../XCompile-arm.txt -DHOST=aarch64-linux-gnu -DPROCESSOR=aarch64
             STRIP: aarch64-linux-gnu-strip
           # -----
+          - ARCH: ppc64el
+            CROSS_ARCH: ppc64el
+            PACKAGES: gcc-aarch64-linux-gnu g++-aarch64-linux-gnu libc6-dev-ppc64el-cross
+            CROSS_PACKAGES: libpulse-dev:ppc64el libglib2.0-dev:ppc64el portaudio19-dev:ppc64el libasound2-dev:ppc64el libjack-dev:ppc64el
+            CC: CC=powerpc64le-linux-gnu-gcc CXX=powerpc64le-linux-gnu-g++
+            CMAKE_PARAMS: -DCMAKE_TOOLCHAIN_FILE=../XCompile-arm.txt -DHOST=powerpc64le-linux-gnu -DPROCESSOR=ppc64el
+            STRIP: powerpc64le-linux-gnu-strip
+          # -----
 #          - ARCH: mips64
 #            CROSS_ARCH: mips64el
 #            PACKAGES: gcc-mips64el-linux-gnuabi64 libc6-dev-mips64el-cross
@@ -64,7 +72,13 @@ jobs:
           then
             sudo sed -i 's/deb http/deb [arch=amd64,i386] http/' /etc/apt/sources.list
             sudo grep "ubuntu.com/ubuntu" /etc/apt/sources.list | sudo tee /etc/apt/sources.list.d/ports.list
-            sudo sed -i 's/amd64,i386/armhf,arm64/' /etc/apt/sources.list.d/ports.list
+            if [[ "${{matrix.ARCH}}" == "arm32" || "${{matrix.ARCH}}" == "arm64" ]]
+            then
+              sudo sed -i 's/amd64,i386/armhf,arm64/' /etc/apt/sources.list.d/ports.list
+            elif [[ "${{matrix.ARCH}}" == "ppc64el" ]]
+            then
+              sudo sed -i 's/amd64,i386/ppc64el,ppc64el/' /etc/apt/sources.list.d/ports.list
+            fi            
             sudo sed -i 's#http://.*/ubuntu#http://ports.ubuntu.com/ubuntu-ports#' /etc/apt/sources.list.d/ports.list
           else
             sudo rm -rf /etc/apt/sources.list
