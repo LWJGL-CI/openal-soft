@@ -72,8 +72,8 @@ jobs:
           aws s3 cp libopenal.so.git s3://lwjgl-build/nightly/linux/${{matrix.ARCH}}/ $S3_PARAMS
         name: Upload git revision
 
-  linux-cross:
-    name: Linux Cross
+  linux-cross-arm:
+    name: Linux Cross Arm
     runs-on: ubuntu-latest
     container:
       image: ubuntu:18.04
@@ -87,14 +87,14 @@ jobs:
             PACKAGES: gcc-arm-linux-gnueabihf g++-arm-linux-gnueabihf libc6-dev-armhf-cross
             CROSS_PACKAGES: libpulse-dev:armhf portaudio19-dev:armhf libasound2-dev:armhf libjack-dev:armhf libdbus-1-dev:armhf #libpipewire-0.3-dev:armhf
             CC: CC=arm-linux-gnueabihf-gcc CXX=arm-linux-gnueabihf-g++
-            CMAKE_PARAMS: -DCMAKE_TOOLCHAIN_FILE=../XCompile-arm.txt -DHOST=arm-linux-gnueabihf -DPROCESSOR=arm
+            CMAKE_PARAMS: -DCMAKE_TOOLCHAIN_FILE=../XCompile-Linux.txt -DHOST=arm-linux-gnueabihf -DPROCESSOR=arm
             STRIP: arm-linux-gnueabihf-strip
           - ARCH: arm64
             CROSS_ARCH: arm64
             PACKAGES: gcc-aarch64-linux-gnu g++-aarch64-linux-gnu libc6-dev-arm64-cross
             CROSS_PACKAGES: libpulse-dev:arm64 portaudio19-dev:arm64 libasound2-dev:arm64 libjack-dev:arm64 libdbus-1-dev:arm64 #libpipewire-0.3-dev:arm64
             CC: CC=aarch64-linux-gnu-gcc CXX=aarch64-linux-gnu-g++
-            CMAKE_PARAMS: -DCMAKE_TOOLCHAIN_FILE=../XCompile-arm.txt -DHOST=aarch64-linux-gnu -DPROCESSOR=aarch64
+            CMAKE_PARAMS: -DCMAKE_TOOLCHAIN_FILE=../XCompile-Linux.txt -DHOST=aarch64-linux-gnu -DPROCESSOR=aarch64
             STRIP: aarch64-linux-gnu-strip
     steps:
       - run: |
@@ -140,6 +140,59 @@ jobs:
           aws s3 cp libopenal.so.git s3://lwjgl-build/nightly/linux/${{matrix.ARCH}}/ $S3_PARAMS
         name: Upload git revision
 
+  linux-cross-riscv:
+    name: Linux Cross RISC-V
+    runs-on: ubuntu-latest
+    container:
+      image: ubuntu:20.04
+    strategy:
+      fail-fast: false
+      matrix:
+        ARCH: [riscv64]
+        include:
+          - ARCH: riscv64
+            CROSS_ARCH: riscv64
+            PACKAGES: gcc-riscv64-linux-gnu g++-riscv64-linux-gnu libc6-dev-riscv64-cross
+            CROSS_PACKAGES: libpulse-dev:riscv64 portaudio19-dev:riscv64 libasound2-dev:riscv64 libjack-dev:riscv64 libdbus-1-dev:riscv64 #libpipewire-0.3-dev:riscv64
+            CC: CC=riscv64-linux-gnu-gcc CXX=riscv64-linux-gnu-g++
+            CMAKE_PARAMS: -DCMAKE_TOOLCHAIN_FILE=../XCompile-Linux.txt -DHOST=riscv64-linux-gnu -DPROCESSOR=riscv64
+            STRIP: riscv64-linux-gnu-strip
+    steps:
+      - run: |
+          apt-get -y update
+          apt-get -y upgrade
+          DEBIAN_FRONTEND=noninteractive apt-get -yq install awscli git
+        name: Upgrade git
+      - uses: actions/checkout@v3
+        with:
+          fetch-depth: 3
+      - run: DEBIAN_FRONTEND=noninteractive apt-get -yq install cmake ${{matrix.PACKAGES}}
+        name: Install dependencies
+      - run: |
+          sed -i 's/deb http/deb [arch=amd64,i386] http/' /etc/apt/sources.list
+          grep "ubuntu.com/ubuntu" /etc/apt/sources.list | tee /etc/apt/sources.list.d/ports.list
+          sed -i 's/amd64,i386/riscv64/' /etc/apt/sources.list.d/ports.list
+          sed -i 's#http://.*/ubuntu#http://ports.ubuntu.com/ubuntu-ports#' /etc/apt/sources.list.d/ports.list
+          dpkg --add-architecture ${{matrix.CROSS_ARCH}}
+          apt-get update || true
+        name: Prepare cross-compilation
+      - run: apt-get -yq --allow-unauthenticated --no-install-suggests --no-install-recommends install ${{matrix.CROSS_PACKAGES}} -o Dpkg::Options::="--force-overwrite"
+        name: Install cross-compilation dependencies
+      - run: ${{matrix.CC}} cmake -B build -DALSOFT_REQUIRE_RTKIT=ON -DALSOFT_REQUIRE_ALSA=ON -DALSOFT_REQUIRE_OSS=ON -DALSOFT_REQUIRE_PORTAUDIO=ON -DALSOFT_REQUIRE_PULSEAUDIO=ON -DALSOFT_REQUIRE_JACK=ON -DALSOFT_EMBED_HRTF_DATA=YES -DCMAKE_BUILD_TYPE=Release -DCMAKE_C_FLAGS="-U_FORTIFY_SOURCE -D_FORTIFY_SOURCE=0" ${{matrix.CMAKE_PARAMS}}
+        name: Configure build
+        #-DALSOFT_REQUIRE_PIPEWIRE=ON
+      - run: |
+          cmake --build build --parallel
+          ${{matrix.STRIP}} build/libopenal.so
+        name: Build
+      - run: aws s3 cp build/libopenal.so s3://lwjgl-build/nightly/linux/${{matrix.ARCH}}/ $S3_PARAMS
+        name: Upload artifact
+      - run: |
+          git config --global --add safe.directory $(pwd)
+          git log --first-parent --pretty=format:%H HEAD~2..HEAD~1 > libopenal.so.git
+          aws s3 cp libopenal.so.git s3://lwjgl-build/nightly/linux/${{matrix.ARCH}}/ $S3_PARAMS
+        name: Upload git revision
+  
   macos:
     name: macOS
     runs-on: macos-latest
