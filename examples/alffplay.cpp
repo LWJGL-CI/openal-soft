@@ -2371,7 +2371,7 @@ auto main(std::span<std::string_view> args) -> int
         if(argval == "-tune")
         {
             if(curarg+1 == args_end)
-                fmt::println(std::cerr, "Missing argument for -tstretch");
+                fmt::println(std::cerr, "Missing argument for -tune");
             else
             {
                 const auto optarg = *++curarg;
@@ -2381,7 +2381,7 @@ auto main(std::span<std::string_view> args) -> int
                 {
                     try { return std::stof(std::string{optarg}, &endpos); }
                     catch(std::exception &e) {
-                        fmt::println(std::cerr, "Exception reading tstretch value: {}", e.what());
+                        fmt::println(std::cerr, "Exception reading tune value: {}", e.what());
                     }
                     return std::numeric_limits<float>::quiet_NaN();
                 });
