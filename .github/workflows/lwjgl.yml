@@ -73,7 +73,7 @@ jobs:
 
   linux-cross:
     name: Linux Cross
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-24.04
     strategy:
       fail-fast: false
       matrix:
@@ -114,8 +114,8 @@ jobs:
         run: |
           DEBIAN_FRONTEND=noninteractive sudo apt-get -yq update
           DEBIAN_FRONTEND=noninteractive sudo apt-get -yq install awscli cmake build-essential \
-            gcc-12-${{matrix.TRIPLET}} \
-            g++-12-${{matrix.TRIPLET}} \
+            gcc-14-${{matrix.TRIPLET}} \
+            g++-14-${{matrix.TRIPLET}} \
             libc6-dev-${{matrix.CROSS_ARCH}}-cross
       - name: Prepare cross-compilation
         run: |
@@ -136,7 +136,7 @@ jobs:
       - name: Configure build
         run: |
           export PKG_CONFIG_LIBDIR="/usr/lib/${{matrix.TRIPLET}}/pkgconfig:/usr/share/pkgconfig"
-          CC=${{matrix.TRIPLET}}-gcc-12 CXX=${{matrix.TRIPLET}}-g++-12 cmake -B build \
+          CC=${{matrix.TRIPLET}}-gcc-14 CXX=${{matrix.TRIPLET}}-g++-14 cmake -B build \
             -DALSOFT_REQUIRE_RTKIT=ON \
             -DALSOFT_REQUIRE_ALSA=ON \
             -DALSOFT_REQUIRE_OSS=ON \
