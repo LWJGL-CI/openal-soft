@@ -1437,9 +1437,9 @@ FORCE_ALIGN void WasapiPlayback::mixerProc(SpatialDevice const &audio)
             {
                 auto *buffer = LPBYTE{};
                 auto size = UINT32{};
-                obj.GetBuffer(&buffer, &size);
+                std::ignore = obj.GetBuffer(&buffer, &size);
                 return buffer;
-            }, &ComPtr<ISpatialAudioObject>::operator*);
+            }, al::dereference{});
 
             if(!mResampler)
                 mDevice->renderSamples(buffers, framesToDo);

@@ -417,7 +417,7 @@ void LoadDriverList()
         return drv.ALCVer >= MakeALCVer(1, 1)
             || drv.alcIsExtensionPresent(nullptr, "ALC_ENUMERATE_ALL_EXT")
             || drv.alcIsExtensionPresent(nullptr, "ALC_ENUMERATION_EXT");
-    }, &DriverIfacePtr::operator*);
+    }, al::dereference{});
 
     /* HACK: rapture3d_oal.dll isn't likely to work if it's one distributed for
      * specific games licensed to use it. It will enumerate a Rapture3D device

@@ -74,6 +74,12 @@ template<typename T>
 constexpr std::underlying_type_t<T> to_underlying(T e) noexcept
 { return static_cast<std::underlying_type_t<T>>(e); }
 
+struct dereference {
+    template<typename T> [[nodiscard]] constexpr
+    auto operator()(T&& p) const noexcept(noexcept(*std::forward<T>(p))) -> decltype(auto)
+    { return *std::forward<T>(p); }
+};
+
 /**
  * Gets a not_null<T*> from a not_null<SmartPtr<T>>, hopefully avoiding ths
  * extraneous null check from not_null's constructor.

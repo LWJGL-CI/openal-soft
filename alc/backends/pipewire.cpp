@@ -1408,7 +1408,7 @@ void EventManager::removeCallback(uint32_t const id) noexcept
     RemoveDevice(id);
 
     auto node_end = std::ranges::remove_if(mNodeList, [id](NodeProxy const &node) noexcept
-    { return node.mId == id; }, &std::unique_ptr<NodeProxy>::operator*);
+    { return node.mId == id; }, al::dereference{});
     mNodeList.erase(node_end.begin(), node_end.end());
 
     if(mDefaultMetadata && mDefaultMetadata->mId == id)
